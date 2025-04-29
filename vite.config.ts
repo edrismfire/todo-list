@@ -51,10 +51,12 @@ const mongoMiddleware = (): Plugin => ({
     server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next) => {
       // Enable CORS
       res.setHeader('Access-Control-Allow-Origin', '*')
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH')
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
+      res.setHeader('Access-Control-Max-Age', '86400') // 24 hours
+      res.setHeader('Access-Control-Allow-Credentials', 'true')
 
-      // Handle OPTIONS request
+      // Handle preflight requests
       if (req.method === 'OPTIONS') {
         res.writeHead(204)
         res.end()
@@ -78,11 +80,17 @@ const mongoMiddleware = (): Plugin => ({
               body += chunk.toString()
             })
             req.on('end', async () => {
-              const { text } = JSON.parse(body)
-              const todo = new Todo({ text })
-              const savedTodo = await todo.save()
-              res.setHeader('Content-Type', 'application/json')
-              res.end(JSON.stringify(savedTodo))
+              try {
+                const { text } = JSON.parse(body)
+                const todo = new Todo({ text })
+                const savedTodo = await todo.save()
+                res.setHeader('Content-Type', 'application/json')
+                res.writeHead(201)
+                res.end(JSON.stringify(savedTodo))
+              } catch (parseError) {
+                res.writeHead(400)
+                res.end(JSON.stringify({ error: 'Invalid request body' }))
+              }
             })
             return
           }
@@ -117,6 +125,11 @@ const mongoMiddleware = (): Plugin => ({
             }
             return
           }
+
+          // Method not allowed
+          res.writeHead(405)
+          res.end(JSON.stringify({ error: 'Method not allowed' }))
+          return
         } catch (error) {
           console.error('API Error:', error)
           res.statusCode = 500
@@ -130,7 +143,7 @@ const mongoMiddleware = (): Plugin => ({
 })
 
 // https://vite.dev/config/
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, mode }) => ({
   plugins: [
     react(),
     // Only add mongoMiddleware in development mode
@@ -138,7 +151,13 @@ export default defineConfig(({ command }) => ({
   ].filter(Boolean),
   server: {
     port: 5173,
-    strictPort: true
+    strictPort: true,
+    cors: {
+      origin: '*',
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+      credentials: true
+    }
   }
 }))
 
