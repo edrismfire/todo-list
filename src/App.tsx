@@ -10,10 +10,14 @@ interface Todo {
 function App() {
   const [todos, setTodos] = useState<Todo[]>(() => {
     const savedTodos = localStorage.getItem('todos');
-    return savedTodos ? JSON.parse(savedTodos) : [];
+    try {
+      return savedTodos ? JSON.parse(savedTodos) : [];
+    } catch (e) {
+      console.error('Failed to parse todos:', e);
+      return [];
+    }
   });
   const [newTodo, setNewTodo] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = localStorage.getItem('theme');
     return savedTheme === 'dark' || 
@@ -21,12 +25,20 @@ function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('todos', JSON.stringify(todos));
+    try {
+      localStorage.setItem('todos', JSON.stringify(todos));
+    } catch (e) {
+      console.error('Failed to save todos:', e);
+    }
   }, [todos]);
 
   useEffect(() => {
-    localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
-    document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+    try {
+      localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+    } catch (e) {
+      console.error('Failed to save theme:', e);
+    }
   }, [isDarkMode]);
 
   const addTodo = (e: React.FormEvent) => {
@@ -67,7 +79,6 @@ function App() {
           {isDarkMode ? '☀️' : '🌙'}
         </button>
       </div>
-      {error && <div className="error-message">{error}</div>}
       <form onSubmit={addTodo} className="todo-form">
         <input
           type="text"
