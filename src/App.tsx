@@ -47,7 +47,7 @@ function App() {
     try {
       const result = await createTodo(newTodo);
       if (result.success && result.data) {
-        setTodos(prevTodos => [result.data, ...prevTodos]);
+        setTodos(prevTodos => [result.data!, ...prevTodos]);
         setNewTodo('');
       } else {
         setError(result.error || 'Failed to add todo');

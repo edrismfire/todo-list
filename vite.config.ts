@@ -19,6 +19,12 @@ const TodoSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 })
 
+type TodoDocument = mongoose.Document & {
+  text: string;
+  completed: boolean;
+  createdAt: Date;
+}
+
 // MongoDB connection
 const connectDB = async () => {
   const uri = process.env.VITE_MONGODB_URI
@@ -56,11 +62,11 @@ const mongoMiddleware = (): Plugin => ({
       }
 
       if (req.url?.startsWith('/api/todos')) {
-        const Todo = mongoose.models.Todo || mongoose.model('Todo', TodoSchema)
+        const Todo = (mongoose.models.Todo || mongoose.model('Todo', TodoSchema)) as mongoose.Model<TodoDocument>
 
         try {
           if (req.method === 'GET') {
-            const todos = await Todo.find().sort({ createdAt: -1 })
+            const todos = await Todo.find().sort({ createdAt: -1 }).exec()
             res.setHeader('Content-Type', 'application/json')
             res.end(JSON.stringify(todos))
             return
@@ -87,7 +93,7 @@ const mongoMiddleware = (): Plugin => ({
               id,
               { $set: { completed: { $not: '$completed' } } },
               { new: true }
-            )
+            ).exec()
             
             if (todo) {
               res.setHeader('Content-Type', 'application/json')
@@ -101,7 +107,7 @@ const mongoMiddleware = (): Plugin => ({
 
           if (req.method === 'DELETE') {
             const id = req.url.split('/').pop()
-            const todo = await Todo.findByIdAndDelete(id)
+            const todo = await Todo.findByIdAndDelete(id).exec()
             if (todo) {
               res.setHeader('Content-Type', 'application/json')
               res.end(JSON.stringify(todo))

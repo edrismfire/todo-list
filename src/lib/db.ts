@@ -1,10 +1,12 @@
 import mongoose from 'mongoose';
 
+interface GlobalMongoose {
+  conn: typeof mongoose | null;
+  promise: Promise<typeof mongoose> | null;
+}
+
 declare global {
-  var mongoose: {
-    conn: typeof mongoose | null;
-    promise: Promise<typeof mongoose> | null;
-  };
+  var mongoose: GlobalMongoose;
 }
 
 const MONGODB_URI = import.meta.env.VITE_MONGODB_URI as string;
@@ -19,9 +21,9 @@ if (!cached) {
   cached = global.mongoose = { conn: null, promise: null };
 }
 
-async function connectDB() {
+async function connectDB(): Promise<GlobalMongoose> {
   if (cached.conn) {
-    return cached.conn;
+    return cached;
   }
 
   if (!cached.promise) {
@@ -41,7 +43,7 @@ async function connectDB() {
     throw e;
   }
 
-  return cached.conn;
+  return cached;
 }
 
 export default connectDB; 
