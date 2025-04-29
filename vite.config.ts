@@ -41,11 +41,11 @@ const connectDB = async () => {
   }
 }
 
-// Custom plugin for MongoDB middleware (development only)
+// Custom plugin for MongoDB middleware
 const mongoMiddleware = (): Plugin => ({
   name: 'mongo-middleware',
   configureServer(server) {
-    // Connect to MongoDB only in development
+    // Connect to MongoDB
     connectDB()
 
     server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next) => {
@@ -139,16 +139,19 @@ const mongoMiddleware = (): Plugin => ({
       }
       next()
     })
+  },
+  configurePreviewServer(server) {
+    // Also configure for preview/production
+    this.configureServer(server)
   }
 })
 
 // https://vite.dev/config/
-export default defineConfig(({ command, mode }) => ({
+export default defineConfig({
   plugins: [
     react(),
-    // Only add mongoMiddleware in development mode
-    command === 'serve' ? mongoMiddleware() : null
-  ].filter(Boolean),
+    mongoMiddleware()
+  ],
   server: {
     port: 5173,
     strictPort: true,
@@ -160,20 +163,20 @@ export default defineConfig(({ command, mode }) => ({
       exposedHeaders: ['*'],
       preflightContinue: true,
       optionsSuccessStatus: 200
-    },
-    proxy: {
-      '/api': {
-        target: process.env.VITE_API_URL,
-        changeOrigin: true,
-        secure: false,
-        ws: true,
-      }
     }
   },
   preview: {
     port: 5173,
     strictPort: true,
-    cors: true
+    cors: {
+      origin: '*',
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', '*'],
+      exposedHeaders: ['*'],
+      preflightContinue: true,
+      optionsSuccessStatus: 200
+    }
   }
-}))
+})
 
