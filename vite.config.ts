@@ -49,16 +49,16 @@ const mongoMiddleware = (): Plugin => ({
     connectDB()
 
     server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next) => {
-      // Enable CORS
+      // Set permissive CORS headers
       res.setHeader('Access-Control-Allow-Origin', '*')
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH')
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
-      res.setHeader('Access-Control-Max-Age', '86400') // 24 hours
+      res.setHeader('Access-Control-Allow-Methods', '*')
+      res.setHeader('Access-Control-Allow-Headers', '*')
+      res.setHeader('Access-Control-Allow-Private-Network', 'true')
       res.setHeader('Access-Control-Allow-Credentials', 'true')
 
-      // Handle preflight requests
+      // Handle preflight
       if (req.method === 'OPTIONS') {
-        res.writeHead(204)
+        res.writeHead(200)
         res.end()
         return
       }
@@ -154,10 +154,26 @@ export default defineConfig(({ command, mode }) => ({
     strictPort: true,
     cors: {
       origin: '*',
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-      credentials: true
+      methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+      credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', '*'],
+      exposedHeaders: ['*'],
+      preflightContinue: true,
+      optionsSuccessStatus: 200
+    },
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_URL || 'http://localhost:5173',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+      }
     }
+  },
+  preview: {
+    port: 5173,
+    strictPort: true,
+    cors: true
   }
 }))
 
