@@ -41,13 +41,13 @@ const connectDB = async () => {
   }
 }
 
-// Connect to MongoDB
-connectDB()
-
-// Custom plugin for MongoDB middleware
+// Custom plugin for MongoDB middleware (development only)
 const mongoMiddleware = (): Plugin => ({
   name: 'mongo-middleware',
   configureServer(server) {
+    // Connect to MongoDB only in development
+    connectDB()
+
     server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next) => {
       // Enable CORS
       res.setHeader('Access-Control-Allow-Origin', '*')
@@ -130,11 +130,15 @@ const mongoMiddleware = (): Plugin => ({
 })
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react(), mongoMiddleware()],
+export default defineConfig(({ command }) => ({
+  plugins: [
+    react(),
+    // Only add mongoMiddleware in development mode
+    command === 'serve' ? mongoMiddleware() : null
+  ].filter(Boolean),
   server: {
     port: 5173,
     strictPort: true
   }
-})
+}))
 
