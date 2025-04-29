@@ -1,6 +1,14 @@
 import { ITodo } from '../models/Todo';
 
-const API_URL = import.meta.env.VITE_API_URL;
+// Default to the production URL if environment variable is not set
+const API_URL = import.meta.env.VITE_API_URL || 'https://todo-list-iye9.onrender.com';
+
+// Remove any trailing slashes and ensure proper URL construction
+const getApiUrl = (endpoint: string) => {
+  const baseUrl = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
+  const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  return `${baseUrl}${path}`;
+};
 
 interface ApiResponse<T> {
   success: boolean;
@@ -11,7 +19,7 @@ interface ApiResponse<T> {
 // Get all todos
 export async function getTodos(): Promise<ApiResponse<ITodo[]>> {
   try {
-    const response = await fetch(`${API_URL}/todos`);
+    const response = await fetch(getApiUrl('/api/todos'));
     if (!response.ok) {
       throw new Error('Failed to fetch todos');
     }
@@ -26,7 +34,7 @@ export async function getTodos(): Promise<ApiResponse<ITodo[]>> {
 // Create a new todo
 export async function createTodo(text: string): Promise<ApiResponse<ITodo>> {
   try {
-    const response = await fetch(`${API_URL}/todos`, {
+    const response = await fetch(getApiUrl('/api/todos'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -47,7 +55,7 @@ export async function createTodo(text: string): Promise<ApiResponse<ITodo>> {
 // Toggle todo completion status
 export async function toggleTodo(id: string): Promise<ApiResponse<ITodo>> {
   try {
-    const response = await fetch(`${API_URL}/todos/${id}`, {
+    const response = await fetch(getApiUrl(`/api/todos/${id}`), {
       method: 'PUT',
     });
     if (!response.ok) {
@@ -64,7 +72,7 @@ export async function toggleTodo(id: string): Promise<ApiResponse<ITodo>> {
 // Delete a todo
 export async function deleteTodo(id: string): Promise<ApiResponse<ITodo>> {
   try {
-    const response = await fetch(`${API_URL}/todos/${id}`, {
+    const response = await fetch(getApiUrl(`/api/todos/${id}`), {
       method: 'DELETE',
     });
     if (!response.ok) {
