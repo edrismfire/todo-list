@@ -2,8 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import mongoose from 'mongoose'
 import { IncomingMessage, ServerResponse } from 'http'
-import type { Plugin } from 'vite'
-import type { RequestHandler } from 'express'
+import type { Plugin, ViteDevServer, PreviewServer } from 'vite'
 import dotenv from 'dotenv'
 
 // Load environment variables
@@ -41,108 +40,112 @@ const connectDB = async () => {
   }
 }
 
+// Shared server configuration function
+const configureServer = (server: ViteDevServer | PreviewServer) => {
+  // Connect to MongoDB
+  connectDB()
+
+  server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next) => {
+    // Set permissive CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Access-Control-Allow-Methods', '*')
+    res.setHeader('Access-Control-Allow-Headers', '*')
+    res.setHeader('Access-Control-Allow-Private-Network', 'true')
+    res.setHeader('Access-Control-Allow-Credentials', 'true')
+
+    // Handle preflight
+    if (req.method === 'OPTIONS') {
+      res.writeHead(200)
+      res.end()
+      return
+    }
+
+    if (req.url?.startsWith('/api/todos')) {
+      const Todo = (mongoose.models.Todo || mongoose.model('Todo', TodoSchema)) as mongoose.Model<TodoDocument>
+
+      try {
+        if (req.method === 'GET') {
+          const todos = await Todo.find().sort({ createdAt: -1 }).exec()
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify(todos))
+          return
+        }
+
+        if (req.method === 'POST') {
+          let body = ''
+          req.on('data', (chunk: Buffer) => {
+            body += chunk.toString()
+          })
+          req.on('end', async () => {
+            try {
+              const { text } = JSON.parse(body)
+              const todo = new Todo({ text })
+              const savedTodo = await todo.save()
+              res.setHeader('Content-Type', 'application/json')
+              res.writeHead(201)
+              res.end(JSON.stringify(savedTodo))
+            } catch (parseError) {
+              res.writeHead(400)
+              res.end(JSON.stringify({ error: 'Invalid request body' }))
+            }
+          })
+          return
+        }
+
+        if (req.method === 'PUT') {
+          const id = req.url.split('/').pop()
+          const todo = await Todo.findByIdAndUpdate(
+            id,
+            { $set: { completed: { $not: '$completed' } } },
+            { new: true }
+          ).exec()
+          
+          if (todo) {
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify(todo))
+          } else {
+            res.statusCode = 404
+            res.end(JSON.stringify({ error: 'Todo not found' }))
+          }
+          return
+        }
+
+        if (req.method === 'DELETE') {
+          const id = req.url.split('/').pop()
+          const todo = await Todo.findByIdAndDelete(id).exec()
+          if (todo) {
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify(todo))
+          } else {
+            res.statusCode = 404
+            res.end(JSON.stringify({ error: 'Todo not found' }))
+          }
+          return
+        }
+
+        // Method not allowed
+        res.writeHead(405)
+        res.end(JSON.stringify({ error: 'Method not allowed' }))
+        return
+      } catch (error) {
+        console.error('API Error:', error)
+        res.statusCode = 500
+        res.end(JSON.stringify({ error: 'Internal server error' }))
+        return
+      }
+    }
+    next()
+  })
+}
+
 // Custom plugin for MongoDB middleware
 const mongoMiddleware = (): Plugin => ({
   name: 'mongo-middleware',
   configureServer(server) {
-    // Connect to MongoDB
-    connectDB()
-
-    server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next) => {
-      // Set permissive CORS headers
-      res.setHeader('Access-Control-Allow-Origin', '*')
-      res.setHeader('Access-Control-Allow-Methods', '*')
-      res.setHeader('Access-Control-Allow-Headers', '*')
-      res.setHeader('Access-Control-Allow-Private-Network', 'true')
-      res.setHeader('Access-Control-Allow-Credentials', 'true')
-
-      // Handle preflight
-      if (req.method === 'OPTIONS') {
-        res.writeHead(200)
-        res.end()
-        return
-      }
-
-      if (req.url?.startsWith('/api/todos')) {
-        const Todo = (mongoose.models.Todo || mongoose.model('Todo', TodoSchema)) as mongoose.Model<TodoDocument>
-
-        try {
-          if (req.method === 'GET') {
-            const todos = await Todo.find().sort({ createdAt: -1 }).exec()
-            res.setHeader('Content-Type', 'application/json')
-            res.end(JSON.stringify(todos))
-            return
-          }
-
-          if (req.method === 'POST') {
-            let body = ''
-            req.on('data', (chunk: Buffer) => {
-              body += chunk.toString()
-            })
-            req.on('end', async () => {
-              try {
-                const { text } = JSON.parse(body)
-                const todo = new Todo({ text })
-                const savedTodo = await todo.save()
-                res.setHeader('Content-Type', 'application/json')
-                res.writeHead(201)
-                res.end(JSON.stringify(savedTodo))
-              } catch (parseError) {
-                res.writeHead(400)
-                res.end(JSON.stringify({ error: 'Invalid request body' }))
-              }
-            })
-            return
-          }
-
-          if (req.method === 'PUT') {
-            const id = req.url.split('/').pop()
-            const todo = await Todo.findByIdAndUpdate(
-              id,
-              { $set: { completed: { $not: '$completed' } } },
-              { new: true }
-            ).exec()
-            
-            if (todo) {
-              res.setHeader('Content-Type', 'application/json')
-              res.end(JSON.stringify(todo))
-            } else {
-              res.statusCode = 404
-              res.end(JSON.stringify({ error: 'Todo not found' }))
-            }
-            return
-          }
-
-          if (req.method === 'DELETE') {
-            const id = req.url.split('/').pop()
-            const todo = await Todo.findByIdAndDelete(id).exec()
-            if (todo) {
-              res.setHeader('Content-Type', 'application/json')
-              res.end(JSON.stringify(todo))
-            } else {
-              res.statusCode = 404
-              res.end(JSON.stringify({ error: 'Todo not found' }))
-            }
-            return
-          }
-
-          // Method not allowed
-          res.writeHead(405)
-          res.end(JSON.stringify({ error: 'Method not allowed' }))
-          return
-        } catch (error) {
-          console.error('API Error:', error)
-          res.statusCode = 500
-          res.end(JSON.stringify({ error: 'Internal server error' }))
-          return
-        }
-      }
-      next()
-    })
+    configureServer(server)
   },
   configurePreviewServer(server) {
-    // Also configure for preview/production
-    this.configureServer(server)
+    configureServer(server)
   }
 })
 
