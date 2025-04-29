@@ -10,8 +10,12 @@ COPY package*.json ./
 RUN npm cache clean --force && \
     npm install
 
-# Copy source code
+# Copy source code and env files
 COPY . .
+
+# Create .env file from build args
+ARG VITE_MONGODB_URI
+RUN echo "VITE_MONGODB_URI=$VITE_MONGODB_URI" > .env
 
 # Build the application
 RUN npm run build
